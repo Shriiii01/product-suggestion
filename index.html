@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ChatGPT Style Chat</title>
+  <style>
+    :root {
+      --sidebar-width: 280px;
+      --border: #2a2a2a;
+      --bg: #0b0f15;
+      --panel: #1b1f27;
+      --text: #e5e7eb;
+      --sub: #9ca3af;
+    }
+    * { box-sizing: border-box; }
+    html, body { 
+      height: 100%; 
+      margin: 0; 
+      font-family: sans-serif; 
+      background: var(--bg); 
+      color: var(--text);
+      overflow-x: hidden;
+    }
+
+    /* Hide browser default elements */
+    body::before,
+    body::after {
+      display: none !important;
+    }
+
+    /* Hide any browser default text */
+    [aria-label*="menu"],
+    [title*="menu"],
+    [alt*="menu"] {
+      display: none !important;
+    }
+
+    .app {
+      display: flex;
+      height: 100%;
+      width: 100%;
+      margin-top: 60px;
+      transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .sidebar {
+      width: var(--sidebar-width);
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      transform: translateX(-100%);
+      opacity: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    /* Left sidebar border */
+    .sidebar.left-sidebar {
+      border-right: none;
+      border-left: 1px solid var(--border);
+    }
+
+    .sidebar.visible {
+      transform: translateX(0);
+      opacity: 1;
+    }
+
+    .content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .chat-area {
+      flex: 1;
+      padding: 16px;
+    }
+
+    .composer {
+      position: fixed;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 90%;
+      max-width: 900px;
+      background: rgba(16, 20, 28, 0.95);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+      z-index: 100;
+      transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Input box positioning when chat is open */
+    .composer.adjusted-left {
+      left: calc(50% + var(--sidebar-width) / 2);
+    }
+
+    .composer.adjusted-right {
+      left: calc(50% - var(--sidebar-width) / 2);
+    }
+    .composer textarea {
+      flex: 1;
+      resize: none;
+      height: 70px;
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      font-size: 16px;
+      font-family: inherit;
+      line-height: 1.5;
+      transition: all 0.3s ease;
+    }
+    .composer textarea:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    .composer button {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      padding: 0 24px;
+      height: 70px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 16px;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+    .composer button:hover {
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
+    }
+    .composer button:active {
+      transform: translateY(0);
+    }
+
+    /* Right dock */
+    .dock-right {
+      flex-direction: row-reverse;
+    }
+    .dock-right .sidebar {
+      border-left: 1px solid var(--border);
+      border-right: none;
+      transform: translateX(100%);
+    }
+    .dock-right .sidebar.visible {
+      transform: translateX(0);
+    }
+
+    /* Floating */
+    .floating-sidebar {
+      position: absolute;
+      right: 20px;
+      bottom: 80px;
+      width: var(--sidebar-width);
+      max-height: 60%;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      z-index: 10;
+      transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      transform: scale(0.8);
+      opacity: 0;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+    }
+    .floating-sidebar.visible {
+      transform: scale(1);
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .chat-item {
+      padding: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      cursor: pointer;
+    }
+    .chat-item:hover { background: rgba(255,255,255,0.08); }
+
+    /* Sidebar content area */
+    .sidebar-content {
+      flex: 1;
+      overflow-y: auto;
+      max-height: calc(100vh - 200px);
+    }
+
+    /* Sidebar footer */
+    .sidebar-footer {
+      margin-top: 0;
+      padding: 16px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+      background: var(--panel);
+    }
+
+    /* Location info text */
+    .location-info {
+      margin-bottom: 12px;
+      text-align: center;
+    }
+
+    .location-info p {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.4;
+      opacity: 1;
+    }
+
+    /* Bottom close button */
+    .chat-close-btn-bottom {
+      width: 100%;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.3s ease;
+      margin-top: 8px;
+    }
+
+    .chat-close-btn-bottom:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .close-arrow {
+      font-size: 16px;
+      transition: transform 0.3s ease;
+    }
+
+    .chat-close-btn-bottom:hover .close-arrow {
+      transform: translateX(-2px);
+    }
+
+    .topbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 12px;
+      background: rgba(17, 21, 29, 0.95);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 200;
+      box-shadow: 0 2px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .mode-selector-container {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .mode-selector-container select {
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 14px;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .mode-selector-container select:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+    }
+
+    /* Layout toggle button styles */
+    .layout-toggle-btn {
+      position: fixed;
+      width: 50px;
+      height: 50px;
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      z-index: 1000;
+      display: none;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    /* Close button for chat sections */
+    .chat-close-btn {
+      position: absolute;
+      top: 12px;
+      width: 32px;
+      height: 32px;
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text);
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 18px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+      z-index: 1000;
+      backdrop-filter: blur(10px);
+    }
+
+    .chat-close-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      transform: scale(1.1);
+    }
+
+    /* Position close button for left sidebar */
+    .chat-close-btn.left {
+      right: 12px;
+    }
+
+    /* Position close button for right sidebar */
+    .chat-close-btn.right {
+      left: 12px;
+    }
+
+    .layout-toggle-btn:hover {
+      background: var(--bg);
+      transform: scale(1.05);
+    }
+
+    .layout-toggle-btn.visible {
+      display: block;
+    }
+
+    /* Button positioning based on chat location */
+    .layout-toggle-btn.left {
+      top: 80px;
+      left: 20px;
+    }
+
+    .layout-toggle-btn.right {
+      top: 80px;
+      right: 20px;
+    }
+
+    .layout-toggle-btn.floating {
+      bottom: 40px;
+      right: calc(50% - 450px - 70px);
+    }
+
+    /* Layout icon styling */
+    .layout-icon {
+      width: 20px;
+      height: 20px;
+      margin: 0 auto;
+      display: block;
+    }
+
+    .layout-icon rect {
+      fill: none;
+      stroke: var(--text);
+      stroke-width: 2;
+      rx: 2;
+    }
+
+    .layout-icon line {
+      stroke: var(--text);
+      stroke-width: 2;
+    }
+
+
+
+    /* Smooth content adjustment */
+    .content.adjusted-left {
+      margin-left: var(--sidebar-width);
+    }
+
+    .content.adjusted-right {
+      margin-right: var(--sidebar-width);
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="mode-selector-container">
+      <div class="location-info">
+        <p>Change the location of chats section from here</p>
+      </div>
+      <select id="mode">
+        <option value="left">Dock Left</option>
+        <option value="right">Dock Right</option>
+        <option value="floating">Floating</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="app" id="app">
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-content" id="sidebarContent">
+        <!-- Chat items will be added here by JavaScript -->
+      </div>
+      <div class="sidebar-footer">
+        <button class="chat-close-btn-bottom" id="sidebarCloseBtn" title="Close Chat">
+          <span class="close-arrow">←</span>
+          <span class="close-text">Close</span>
+        </button>
+      </div>
+    </div>
+    <div class="content" id="content">
+      <div class="chat-area">
+        <h2>Main Chat</h2>
+        <p>This is the main chat content area, just like ChatGPT.</p>
+      </div>
+      <div class="composer">
+        <textarea placeholder="Type your message…"></textarea>
+        <button>Send</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="floating-sidebar" id="floating">
+    <div class="sidebar-content" id="floatingContent">
+      <!-- Chat items will be added here by JavaScript -->
+    </div>
+    <div class="sidebar-footer">
+      <button class="chat-close-btn-bottom" id="floatingCloseBtn" title="Close Chat">
+        <span class="close-arrow">×</span>
+        <span class="close-text">Close</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Layout toggle button -->
+  <button class="layout-toggle-btn" id="layoutToggleBtn" title="Open Chat">
+    <svg class="layout-icon" viewBox="0 0 24 24">
+      <rect x="2" y="4" width="8" height="16"/>
+      <rect x="14" y="4" width="8" height="16"/>
+      <line x1="12" y1="4" x2="12" y2="20"/>
+    </svg>
+  </button>
+
+  <script>
+    const sidebar = document.getElementById('sidebar');
+    const floating = document.getElementById('floating');
+    const app = document.getElementById('app');
+    const content = document.getElementById('content');
+    const mode = document.getElementById('mode');
+    const layoutToggleBtn = document.getElementById('layoutToggleBtn');
+    const sidebarCloseBtn = document.getElementById('sidebarCloseBtn');
+    const floatingCloseBtn = document.getElementById('floatingCloseBtn');
+
+    const chats = Array.from({length:20}, (_,i)=>`Chat ${i+1}`);
+    const sidebarContent = document.getElementById('sidebarContent');
+    const floatingContent = document.getElementById('floatingContent');
+    
+    sidebarContent.innerHTML = chats.map(c=>`<div class="chat-item">${c}</div>`).join('');
+    floatingContent.innerHTML = chats.map(c=>`<div class="chat-item">${c}</div>`).join('');
+
+    let isChatHidden = true;
+    let currentMode = 'left';
+
+    function applyMode(){
+      app.classList.remove('dock-right');
+      content.classList.remove('adjusted-left', 'adjusted-right');
+      document.querySelector('.composer').classList.remove('adjusted-left', 'adjusted-right');
+      sidebar.classList.remove('left-sidebar');
+      
+      // Hide previous sidebar
+      sidebar.classList.remove('visible');
+      floating.classList.remove('visible');
+      
+      // Update close button arrow direction based on mode
+      const closeArrow = sidebarCloseBtn.querySelector('.close-arrow');
+      
+      if(mode.value === 'right'){
+        app.classList.add('dock-right');
+        currentMode = 'right';
+        closeArrow.textContent = '→';
+      } else if(mode.value === 'floating'){
+        currentMode = 'floating';
+      } else {
+        currentMode = 'left';
+        sidebar.classList.add('left-sidebar');
+        closeArrow.textContent = '←';
+      }
+      
+      // Show layout button (chat starts closed)
+      showLayoutButton();
+      isChatHidden = true;
+    }
+
+    
+
+    function showLayoutButton() {
+      // Remove all position classes
+      layoutToggleBtn.classList.remove('left', 'right', 'floating');
+      
+      // Add correct position class
+      layoutToggleBtn.classList.add(currentMode);
+      layoutToggleBtn.classList.add('visible');
+    }
+
+    function openChat() {
+      isChatHidden = false;
+      
+      if (currentMode === 'floating') {
+        floating.classList.add('visible');
+      } else {
+        sidebar.classList.add('visible');
+        
+        // Adjust main content position
+        if (currentMode === 'left') {
+          content.classList.add('adjusted-left');
+          document.querySelector('.composer').classList.add('adjusted-left');
+        } else if (currentMode === 'right') {
+          content.classList.add('adjusted-right');
+          document.querySelector('.composer').classList.add('adjusted-right');
+        }
+      }
+      
+      // Hide the layout button completely when chat is open
+      layoutToggleBtn.classList.remove('visible');
+    }
+
+    function closeChat() {
+      if (currentMode === 'right') {
+        sidebar.classList.remove('visible');
+        content.classList.remove('adjusted-right');
+        document.querySelector('.composer').classList.remove('adjusted-right');
+      } else if (currentMode === 'left') {
+        sidebar.classList.remove('visible');
+        content.classList.remove('adjusted-left');
+        document.querySelector('.composer').classList.remove('adjusted-left');
+      } else if (currentMode === 'floating') {
+        floating.classList.remove('visible');
+      }
+      
+      // Show the layout button again
+      showLayoutButton();
+      isChatHidden = true;
+    }
+
+    mode.addEventListener('change', applyMode);
+    layoutToggleBtn.addEventListener('click', openChat);
+    sidebarCloseBtn.addEventListener('click', closeChat);
+    floatingCloseBtn.addEventListener('click', closeChat);
+    
+    // Initialize - show chat immediately
+    applyMode();
+
+    // Add escape key to close chat
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !isChatHidden) {
+        closeChat();
+      }
+    });
+  </script>
+</body>
+</html>

@@ -11,4 +11,4 @@ clone the repo
 git clone @https://github.com/Shriiii01/product-suggestion.git
 open index.html in any browser
 purpose
-this is a product suggestion repo — a place to experiment with ui feature ideas that could improve usability in chatgpt
+This is a product suggestion repo — a place to experiment with ui feature ideas that could improve usability in ChatGPT 

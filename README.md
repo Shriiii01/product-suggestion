@@ -12,3 +12,4 @@ git clone @https://github.com/Shriiii01/product-suggestion.git
 open index.html in any browser
 purpose
 This is a product suggestion repo — a place to experiment with ui feature ideas that could improve usability in ChatGPT 
+[![Live Demo](https://img.shields.io/badge/demo-online-green.svg)](https://shriiii01.github.io/product-suggestion/)
